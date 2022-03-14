@@ -1,5 +1,6 @@
 from __future__ import annotations
 import numpy as np
+import plotly.graph_objs as go
 from numpy.linalg import inv, det, slogdet
 
 
@@ -32,6 +33,10 @@ class UnivariateGaussian:
         """
         self.biased_ = biased_var
         self.fitted_, self.mu_, self.var_ = False, None, None
+        self.observations = np.random.normal(10, 1, 1000)
+        self.fit(self.observations)
+        print(self.mu_, self.var_)
+
 
     def fit(self, X: np.ndarray) -> UnivariateGaussian:
         """
@@ -51,8 +56,8 @@ class UnivariateGaussian:
         Sets `self.mu_`, `self.var_` attributes according to calculated estimation (where
         estimator is either biased or unbiased). Then sets `self.fitted_` attribute to `True`
         """
-        raise NotImplementedError()
-
+        self.mu_ = np.mean(X)
+        self.var_ = np.var(X)
         self.fitted_ = True
         return self
 
@@ -98,6 +103,24 @@ class UnivariateGaussian:
             log-likelihood calculated
         """
         raise NotImplementedError()
+
+    def plot(self) -> None:
+        """
+
+        :return:
+        """
+        number_of_samples = np.linspace(10, 1000, 100).astype(np.int)
+        absolute_distance = []
+        for num in number_of_samples:
+            partial_observations = np.random.choice(self.observations, num)
+            absolute_distance.append(abs(np.mean(partial_observations) - self.mu_))
+        go.Figure(go.Scatter(x=number_of_samples, y=absolute_distance, mode='markers+lines', name=r'$\widehat\mu$'),
+                  layout=go.Layout(
+                      title=r"$\text{Absolute Distance Between Estimated and True Expectations As Function Of Number Of Samples}$",
+                      xaxis_title="$\\text{number of samples}$",
+                      yaxis_title=r"$ |\mu - \hat\mu|$",
+                      height=300)).show()
+
 
 
 class MultivariateGaussian:
@@ -190,3 +213,5 @@ class MultivariateGaussian:
             log-likelihood calculated
         """
         raise NotImplementedError()
+
+

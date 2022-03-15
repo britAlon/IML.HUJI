@@ -1,6 +1,6 @@
 from __future__ import annotations
 import numpy as np
-import plotly.graph_objs as go
+from math import sqrt, exp, pi, pow
 from numpy.linalg import inv, det, slogdet
 
 
@@ -33,10 +33,6 @@ class UnivariateGaussian:
         """
         self.biased_ = biased_var
         self.fitted_, self.mu_, self.var_ = False, None, None
-        self.observations = np.random.normal(10, 1, 1000)
-        self.fit(self.observations)
-        print(self.mu_, self.var_)
-
 
     def fit(self, X: np.ndarray) -> UnivariateGaussian:
         """
@@ -81,7 +77,11 @@ class UnivariateGaussian:
         """
         if not self.fitted_:
             raise ValueError("Estimator must first be fitted before calling `pdf` function")
-        raise NotImplementedError()
+        PDFs = []
+        for x in X:
+            result = (1 / (sqrt(self.var_ * 2 * pi))) * exp(-0.5 * (pow(((x - self.mu_) / (sqrt(self.var_))), 2)))
+            PDFs.append(result)
+        return PDFs
 
     @staticmethod
     def log_likelihood(mu: float, sigma: float, X: np.ndarray) -> float:
@@ -103,23 +103,6 @@ class UnivariateGaussian:
             log-likelihood calculated
         """
         raise NotImplementedError()
-
-    def plot(self) -> None:
-        """
-
-        :return:
-        """
-        number_of_samples = np.linspace(10, 1000, 100).astype(np.int)
-        absolute_distance = []
-        for num in number_of_samples:
-            partial_observations = np.random.choice(self.observations, num)
-            absolute_distance.append(abs(np.mean(partial_observations) - self.mu_))
-        go.Figure(go.Scatter(x=number_of_samples, y=absolute_distance, mode='markers+lines', name=r'$\widehat\mu$'),
-                  layout=go.Layout(
-                      title=r"$\text{Absolute Distance Between Estimated and True Expectations As Function Of Number Of Samples}$",
-                      xaxis_title="$\\text{number of samples}$",
-                      yaxis_title=r"$ |\mu - \hat\mu|$",
-                      height=300)).show()
 
 
 
@@ -166,8 +149,8 @@ class MultivariateGaussian:
         Sets `self.mu_`, `self.cov_` attributes according to calculated estimation.
         Then sets `self.fitted_` attribute to `True`
         """
-        raise NotImplementedError()
-
+        self.mu_ = np.mean(X, axis=0)
+        self.cov_ = np.cov(X.transpose())
         self.fitted_ = True
         return self
 
@@ -191,7 +174,12 @@ class MultivariateGaussian:
         """
         if not self.fitted_:
             raise ValueError("Estimator must first be fitted before calling `pdf` function")
-        raise NotImplementedError()
+        PDFs = []
+        for x in X:
+            val = (1/sqrt((pow(2*pi), np.size(x)) * det(self.cov_))) * \
+                  exp(-0.5 * np.matmul(np.matmul((x - self.mu_), inv(self.cov_)), (x - self.mu_).transpose()))
+            PDFs.append(val)
+        return PDFs
 
     @staticmethod
     def log_likelihood(mu: np.ndarray, cov: np.ndarray, X: np.ndarray) -> float:
@@ -212,6 +200,11 @@ class MultivariateGaussian:
         log_likelihood: float
             log-likelihood calculated
         """
-        raise NotImplementedError()
+        sum_log_likelihood = 0
+        for x in X:
+            val = np.log((1 / sqrt(pow(2 * pi, 4) * det(cov))) * \
+                         exp(-0.5 * ((x - mu) @ inv(cov)) @ (x - mu).transpose()))
+            sum_log_likelihood += val
+        return sum_log_likelihood
 
 

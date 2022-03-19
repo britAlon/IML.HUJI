@@ -2,8 +2,12 @@ from IMLearn.learners import UnivariateGaussian, MultivariateGaussian
 import numpy as np
 import plotly.graph_objects as go
 import plotly.io as pio
+import seaborn as sns
+import matplotlib.pyplot as plt
+import pandas as pd
 
 pio.templates.default = "simple_white"
+LIKELIHOOD_NUM = 200
 
 
 def test_univariate_gaussian():
@@ -40,37 +44,43 @@ def test_univariate_gaussian():
 def test_multivariate_gaussian():
     # Question 4 - Draw samples and print fitted model
     multivariate_estimator = MultivariateGaussian()
-    observations = np.random.multivariate_normal([0, 0, 4, 0],
-                                                 [[1, 0.2, 0, 0.5], [0.2, 2, 0, 0], [0, 0, 1, 0], [0.5, 0, 0, 1]], 1000)
+    cov_matrix = [[1, 0.2, 0, 0.5], [0.2, 2, 0, 0], [0, 0, 1, 0], [0.5, 0, 0, 1]]
+    observations = np.random.multivariate_normal([0, 0, 4, 0], cov_matrix, 1000)
     multivariate_estimator.fit(observations)
     print(multivariate_estimator.mu_)
     print(multivariate_estimator.cov_)
 
     # Question 5 - Likelihood evaluation
-    f1 = np.linspace(-10, 10, 200)
-    f3 = np.linspace(-10, 10, 200)
+    f1 = np.linspace(-10, 10, LIKELIHOOD_NUM)
+    f3 = np.linspace(-10, 10, LIKELIHOOD_NUM)
     log_likelihood_arr = []
+    expectations = []
     for i in f1:
         for j in f3:
+            expectations.append([i, 0, j, 0])
             log_likelihood_arr.append(
-                multivariate_estimator.log_likelihood([i, 0, j, 0], multivariate_estimator.cov_, observations))
-    go.Figure() \
-        .add_trace(go.Histogram2dContour(x=f1, y=f3,
-                                         colorscale='Blues', reversescale=True, xaxis='x', yaxis='y')) \
-        .add_trace(go.Scatter(x=f1, y=f3, xaxis='x', yaxis='y', mode='markers',
-                              marker=dict(color='rgba(0,0,0,0.3)', size=3))).update_layout(
-        xaxis=dict(zeroline=False, domain=[0, 0.85], showgrid=False),
-        yaxis=dict(zeroline=False, domain=[0, 0.85], showgrid=False),
-        xaxis2=dict(zeroline=False, domain=[0.85, 1], showgrid=False),
-        yaxis2=dict(zeroline=False, domain=[0.85, 1], showgrid=False),
-        hovermode='closest', showlegend=False,
-        title=r"$\text{(4) 2D scatter and marginal distributions}$"
-    ) \
-        .show()
+                multivariate_estimator.log_likelihood([i, 0, j, 0], cov_matrix, observations))
+
+    # create a data frame of f1, f3 and the log-likelihood result
+    data = pd.DataFrame(
+        {'f1': np.repeat(f1, LIKELIHOOD_NUM), 'f3': np.tile(f3, LIKELIHOOD_NUM), 'likelihood': log_likelihood_arr})
+    data_pivoted = data.pivot('f1', 'f3', 'likelihood')
+    # plot the data frame
+    fig, ax = plt.subplots(1, 1)
+    hm = sns.heatmap(data_pivoted, ax=ax)
+    ax.set_title("The Log-Likelihood for Models with Expectations [f1, 0, f3, 0]")
+    ax.set_ylabel("f1")
+    ax.set_xlabel("f3")
+    labels = [np.around(float(item.get_text()), 1) for item in hm.get_xticklabels()]
+    hm.set_yticklabels(labels)
+    hm.set_xticklabels(labels)
+    plt.show()
+
     # Question 6 - Maximum likelihood
+    print(np.around(expectations[np.argmax(log_likelihood_arr)], 3))
 
 
 if __name__ == '__main__':
     np.random.seed(0)
-    # test_univariate_gaussian()
+    test_univariate_gaussian()
     test_multivariate_gaussian()

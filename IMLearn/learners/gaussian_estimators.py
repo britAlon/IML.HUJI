@@ -8,6 +8,7 @@ class UnivariateGaussian:
     """
     Class for univariate Gaussian Distribution Estimator
     """
+
     def __init__(self, biased_var: bool = False) -> UnivariateGaussian:
         """
         Estimator for univariate Gaussian mean and variance parameters
@@ -102,14 +103,17 @@ class UnivariateGaussian:
         log_likelihood: float
             log-likelihood calculated
         """
-        raise NotImplementedError()
-
+        log_likelihood_res = X.size * (-0.5 * np.log(2 * pi) - np.log(sigma))
+        for x in X:
+            log_likelihood_res += -pow((x - mu), 2) / (2 * pow(sigma, 2))
+        return log_likelihood_res
 
 
 class MultivariateGaussian:
     """
     Class for multivariate Gaussian Distribution Estimator
     """
+
     def __init__(self):
         """
         Initialize an instance of multivariate Gaussian estimator
@@ -175,9 +179,11 @@ class MultivariateGaussian:
         if not self.fitted_:
             raise ValueError("Estimator must first be fitted before calling `pdf` function")
         PDFs = []
+        cov_inverse = inv(self.cov_)
+        cov_det = det(self.cov_)
         for x in X:
-            val = (1/sqrt((pow(2*pi), np.size(x)) * det(self.cov_))) * \
-                  exp(-0.5 * np.matmul(np.matmul((x - self.mu_), inv(self.cov_)), (x - self.mu_).transpose()))
+            val = (1 / sqrt((pow(2 * pi), np.size(x)) * cov_det)) * \
+                  exp(-0.5 * np.matmul(np.matmul((x - self.mu_), cov_inverse, (x - self.mu_).transpose())))
             PDFs.append(val)
         return PDFs
 
@@ -200,11 +206,11 @@ class MultivariateGaussian:
         log_likelihood: float
             log-likelihood calculated
         """
-        sum_log_likelihood = 0
+        cov_det = det(cov)
+        cov_inverse = inv(cov)
+        x_length = X.shape[1]
+        n_samples = X.shape[0]
+        sum_log_likelihood = -0.5 * (x_length * n_samples) * np.log(2 * pi) - 0.5 * n_samples * np.log(cov_det)
         for x in X:
-            val = np.log((1 / sqrt(pow(2 * pi, 4) * det(cov))) * \
-                         exp(-0.5 * ((x - mu) @ inv(cov)) @ (x - mu).transpose()))
-            sum_log_likelihood += val
+            sum_log_likelihood += -0.5 * ((x - mu) @ cov_inverse @ (x - mu).transpose())
         return sum_log_likelihood
-
-

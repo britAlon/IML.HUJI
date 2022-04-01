@@ -7,6 +7,7 @@ import pandas as pd
 import plotly.graph_objects as go
 import plotly.express as px
 import plotly.io as pio
+
 __base32 = '0123456789bcdefghjkmnpqrstuvwxyz'
 
 pio.templates.default = "simple_white"
@@ -23,24 +24,27 @@ def erase_invalid_rows(data: pd.DataFrame) -> pd.DataFrame:
     :return:
     """
     data.dropna(inplace=True)
-    return data[
-        (data.sqft_living > 0) & (data.sqft_lot > 0) & (data.price > 0) & (data.floors > 0) & (data.yr_built > 0) & (
-                data.sqft_living15 > 0) & (data.sqft_lot15 > 0)]
+    for column in ['sqft_living', 'sqft_lot', 'price', 'floors', 'yr_built', 'sqft_living15', 'sqft_lot15']:
+        data = data[data[column] > 0]
+    return data
 
 
 def process_data(data: pd.DataFrame) -> pd.DataFrame:
     data = erase_invalid_rows(data)
     # modify the yr_built column to express the time passed from the house building.
-    data.loc[:, 'yr_built'] = data['yr_built'].apply(lambda x: THIS_YEAR - x)
+    years_since_building = data['yr_built'].apply(lambda x: THIS_YEAR - x)
+    data.insert(0, 'years_since_building', years_since_building)
     # modify the yr_renovated column to express the time passed from last renovation.
-    data.loc[:, 'yr_renovated'] = data['yr_renovated'].apply(lambda x: (1 / (THIS_YEAR - x)) if (x > 0) else x)
+    inverse_years_since_renovation = data['yr_renovated'].apply(lambda x: (1 / (THIS_YEAR - x)) if (x > 0) else x)
+    data.insert(0, 'inverse_years_since_renovation', inverse_years_since_renovation)
     # modify the longitude and latitude into geohash codes that will be dummy values
     geo_data = data.apply(lambda x: encode(x.lat, x.long, precision=4), axis=1)
     dummy = pd.get_dummies(geo_data)
     data = data.merge(dummy, left_index=True, right_index=True)
-    for column in ['zipcode', 'lat', 'long', 'id']:
+    for column in ['zipcode', 'lat', 'long', 'id', 'date', 'yr_built', 'yr_renovated']:
         data = data.drop(column, axis=1)
-    print(data.info())
+    data.insert(0, 'intercept', 1)
+    # print(data.info())
     return data
 
 
@@ -51,7 +55,7 @@ def encode(latitude, longitude, precision=12):
     """
     lat_interval, lon_interval = (-90.0, 90.0), (-180.0, 180.0)
     geohash = []
-    bits = [ 16, 8, 4, 2, 1 ]
+    bits = [16, 8, 4, 2, 1]
     bit = 0
     ch = 0
     even = True
@@ -78,6 +82,11 @@ def encode(latitude, longitude, precision=12):
             bit = 0
             ch = 0
     return ''.join(geohash)
+
+
+def calc_perason_correlation(feature: pd.Series, y: pd.Series) -> float:
+    return np.cov(feature, y)[0, 1] / (np.std(feature) * np.std(y))
+
 
 # original exercise functions #
 
@@ -118,19 +127,30 @@ def feature_evaluation(X: pd.DataFrame, y: pd.Series, output_path: str = ".") ->
     output_path: str (default ".")
         Path to folder in which plots are saved
     """
-    raise NotImplementedError()
+    for c in X.columns:
+        if 'c2' in c:
+            X = X.drop(c, axis=1)
+    X = X.drop('intercept', axis=1)
+    for feature in X:
+        p = calc_perason_correlation(X[feature], y)
+        fig = px.scatter(pd.DataFrame({'Feature': X[feature], 'Response - Price': y}), x="Feature",
+                         y="Response - Price",
+                         title=f"Pearson correlation between {feature} and response, with Pearson Correlation {p}")
+        # fig.show()
+        # TODO: save image fails
+        # fig.write_image(output_path + f"\\pearson_correlation_{feature}.png"
 
 
 if __name__ == '__main__':
     np.random.seed(0)
     # Question 1 - Load and preprocessing of housing prices dataset
-    load_data('C:\\Users\\brita\\IML.HUJI\\datasets\\house_prices.csv')
+    data, y_true = load_data('C:\\Users\\brita\\IML.HUJI\\datasets\\house_prices.csv')
 
     # Question 2 - Feature evaluation with respect to response
-    # raise NotImplementedError()
+    feature_evaluation(data, y_true, 'C:\\Users\\brita\\Documents\\CS year 3\\IML\\ex2\\feature_evaluation')
 
     # Question 3 - Split samples into training- and testing sets.
-    # raise NotImplementedError()
+    train_X, train_y, test_X, test_y = split_train_test(data, y_true, 0.75)
 
     # Question 4 - Fit model over increasing percentages of the overall training data
     # For every percentage p in 10%, 11%, ..., 100%, repeat the following 10 times:
@@ -139,4 +159,27 @@ if __name__ == '__main__':
     #   3) Test fitted model over test set
     #   4) Store average and variance of loss over test set
     # Then plot average loss as function of training size with error ribbon of size (mean-2*std, mean+2*std)
-    # raise NotImplementedError()
+    model = LinearRegression()
+    mse_df = []
+    percentages = np.repeat(np.linspace(10, 100, 91), 10)
+    for p in percentages:
+        partial_data = train_X.sample(frac=p / 100)
+        y_true = train_y[partial_data.index]
+        mse = model.fit(partial_data.to_numpy(), y_true).loss(test_X.to_numpy(), test_y.to_numpy())
+        mse_df.append([p, mse])
+    # calculate mean and std MSE for each percentage, and plot the graph
+    df = pd.DataFrame.from_records(mse_df, columns=["percentages", "mse"])
+    df = df.groupby("percentages", as_index=False).agg([np.mean, np.std]).reset_index()
+    fig = go.Figure([go.Scatter(x=df["percentages"], y=df["mse"]["mean"], mode="markers+lines",
+                                name="Average loss"),
+                     go.Scatter(x=df["percentages"], y=df["mse"]["mean"] - 2 * df["mse"]["std"], fill=None,
+                                mode="lines",
+                                line=dict(color="lightgrey"),
+                                showlegend=False),
+                     go.Scatter(x=df["percentages"], y=df["mse"]["mean"] + 2 * df["mse"]["std"], fill='tonexty',
+                                mode="lines",
+                                line=dict(color="lightgrey"),
+                                showlegend=False)], layout=go.Layout(title="Average loss as function of training size",
+                                                                     xaxis={"title": r"$percentages$"},
+                                                                     yaxis={"title": r"$MSE$"}))
+    fig.show()

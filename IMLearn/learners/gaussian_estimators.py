@@ -54,11 +54,14 @@ class UnivariateGaussian:
         estimator is either biased or unbiased). Then sets `self.fitted_` attribute to `True`
         """
         self.mu_ = np.mean(X)
-        self.var_ = np.var(X)
+        if self.biased_:
+            self.var_ = np.var(X)
+        else:
+            self.var_ = np.var(X, ddof=1)
         self.fitted_ = True
         return self
 
-    def pdf(self, X: np.ndarray) -> np.ndarray:
+    def pdf(self, X: np.ndarray) -> float:
         """
         Calculate PDF of observations under Gaussian model with fitted estimators
 
@@ -78,11 +81,7 @@ class UnivariateGaussian:
         """
         if not self.fitted_:
             raise ValueError("Estimator must first be fitted before calling `pdf` function")
-        PDFs = []
-        for x in X:
-            result = (1 / (sqrt(self.var_ * 2 * pi))) * exp(-0.5 * (pow(((x - self.mu_) / (sqrt(self.var_))), 2)))
-            PDFs.append(result)
-        return PDFs
+        return (1 / (np.sqrt(self.var_ * 2 * np.pi))) * np.exp(-0.5 * (np.power(((X - self.mu_) / (np.sqrt(self.var_))), 2)))
 
     @staticmethod
     def log_likelihood(mu: float, sigma: float, X: np.ndarray) -> float:
@@ -154,7 +153,7 @@ class MultivariateGaussian:
         Then sets `self.fitted_` attribute to `True`
         """
         self.mu_ = np.mean(X, axis=0)
-        self.cov_ = np.cov(X.transpose())
+        self.cov_ = np.cov(X, rowvar=False)
         self.fitted_ = True
         return self
 
@@ -182,8 +181,8 @@ class MultivariateGaussian:
         cov_inverse = inv(self.cov_)
         cov_det = det(self.cov_)
         for x in X:
-            val = (1 / sqrt((pow(2 * pi), np.size(x)) * cov_det)) * \
-                  exp(-0.5 * np.matmul(np.matmul((x - self.mu_), cov_inverse, (x - self.mu_).transpose())))
+            val = (1 / sqrt(pow(2 * pi, np.size(x)) * cov_det) * \
+                  exp(-0.5 * np.matmul(np.matmul((x - self.mu_), cov_inverse, (x - self.mu_).transpose()))))
             PDFs.append(val)
         return PDFs
 

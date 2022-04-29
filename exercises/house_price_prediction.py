@@ -44,7 +44,6 @@ def process_data(data: pd.DataFrame) -> pd.DataFrame:
     for column in ['zipcode', 'lat', 'long', 'id', 'date', 'yr_built', 'yr_renovated']:
         data = data.drop(column, axis=1)
     data.insert(0, 'intercept', 1)
-    # print(data.info())
     return data
 
 
@@ -136,9 +135,8 @@ def feature_evaluation(X: pd.DataFrame, y: pd.Series, output_path: str = ".") ->
         fig = px.scatter(pd.DataFrame({'Feature': X[feature], 'Response - Price': y}), x="Feature",
                          y="Response - Price",
                          title=f"Pearson correlation between {feature} and response, with Pearson Correlation {p}")
-        # fig.show()
-        # TODO: save image fails
-        # fig.write_image(output_path + f"\\pearson_correlation_{feature}.png"
+        fig.show()
+        #fig.write_image(output_path + f"\\pearson_correlation_{feature}.png")
 
 
 if __name__ == '__main__':
@@ -146,8 +144,9 @@ if __name__ == '__main__':
     # Question 1 - Load and preprocessing of housing prices dataset
     data, y_true = load_data('C:\\Users\\brita\\IML.HUJI\\datasets\\house_prices.csv')
 
-    # Question 2 - Feature evaluation with respect to response
-    feature_evaluation(data, y_true, 'C:\\Users\\brita\\Documents\\CS year 3\\IML\\ex2\\feature_evaluation')
+    # Question 2 - Feature evaluation with respect to response\
+    my_dir = 'C:\\Users\\brita\\Documents\\CS year 3\\IML\\ex2\\feature_evaluation'
+    feature_evaluation(data, y_true)
 
     # Question 3 - Split samples into training- and testing sets.
     train_X, train_y, test_X, test_y = split_train_test(data, y_true, 0.75)
@@ -167,6 +166,7 @@ if __name__ == '__main__':
         y_true = train_y[partial_data.index]
         mse = model.fit(partial_data.to_numpy(), y_true).loss(test_X.to_numpy(), test_y.to_numpy())
         mse_df.append([p, mse])
+
     # calculate mean and std MSE for each percentage, and plot the graph
     df = pd.DataFrame.from_records(mse_df, columns=["percentages", "mse"])
     df = df.groupby("percentages", as_index=False).agg([np.mean, np.std]).reset_index()
